@@ -1046,7 +1046,10 @@
       letter-spacing: 0.05em;
       pointer-events: none;
     }
-  </style>
+  
+/* HORIZONIA-FIX menu-mobile : evite que le flou de la barre piege le tiroir position:fixed sur mobile (bug affichage menu au scroll) */
+@media(max-width:1024px){nav,nav.scrolled,.nav,.nav.scrolled,.navbar,.navbar.scrolled,header.scrolled,.site-header,.site-header.scrolled{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}}
+</style>
 </head>
 <body>
 
@@ -1664,6 +1667,77 @@
       staggerParents.forEach(el => staggerObserver.observe(el));
     }
   </script>
+
+
+<!-- HORIZONIA-FIX menu-mobile v3 : corrige l'affichage du menu mobile au scroll, ajoute croix + fond cliquable + blocage du scroll. CSS/JS auto-contenu, n'altere ni la structure ni le contenu. -->
+<style id="hznMenuFixCss">
+.hzn-backdrop{position:fixed;inset:0;background:rgba(6,8,12,.5);opacity:0;pointer-events:none;transition:opacity .3s ease}
+.hzn-backdrop.hzn-show{opacity:1;pointer-events:auto}
+.hzn-close{position:absolute;top:14px;right:14px;width:42px;height:42px;border-radius:50%;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0;font-size:22px;line-height:1;opacity:.7}
+.hzn-close:hover{opacity:1}
+html.hzn-lock,body.hzn-lock{overflow:hidden!important}
+@media(min-width:1025px){.hzn-close{display:none!important}.hzn-backdrop{display:none!important}}
+</style>
+<script>
+(function(){
+  if(window.__hznMenuFix)return; window.__hznMenuFix=1;
+  var drawer=document.querySelector('.nav-links,.navlinks,.nav-mobile,.mobile-menu,.menu-mobile,.nav-menu,.nav-drawer,.mobile-nav,.nav__links,#navlinks,#mobileMenu,#nav-menu,#mobile-menu');
+  var burger=document.querySelector('.burger,.hamburger,.menu-toggle,.nav-toggle,.menu-btn,.nav-burger,.hamb,[class*="burger"],[class*="hamburger"],[aria-label*="menu" i],#burger,#menuToggle,#hamburger');
+  if(!drawer||!burger)return;
+  var MOB=function(){return window.matchMedia('(max-width:1024px)').matches;};
+  var neutralized=[];
+  function neutralizeAncestors(){
+    var el=drawer.parentElement;
+    while(el&&el!==document.documentElement&&el!==document.body){
+      var cs=getComputedStyle(el),props=['backdropFilter','webkitBackdropFilter','filter','transform','perspective','willChange'];
+      for(var i=0;i<props.length;i++){var p=props[i],v=cs[p];
+        if(v&&v!=='none'&&v!=='auto'){neutralized.push([el,p,el.style[p]]);el.style.setProperty(p.replace(/([A-Z])/g,'-$1').toLowerCase(),'none','important');}}
+      el=el.parentElement;
+    }
+  }
+  function restore(){neutralized.forEach(function(x){x[0].style[x[1]]=x[2]||'';});neutralized=[];}
+  var backdrop=document.createElement('div');backdrop.className='hzn-backdrop';
+  var closeBtn=document.createElement('button');closeBtn.className='hzn-close';closeBtn.setAttribute('aria-label','Fermer le menu');closeBtn.innerHTML='&#10005;';
+  function place(){
+    if(backdrop.parentNode!==drawer.parentNode)drawer.parentNode.insertBefore(backdrop,drawer);
+    if(closeBtn.parentNode!==drawer)drawer.appendChild(closeBtn);
+    var z=parseInt(getComputedStyle(drawer).zIndex,10);if(!z||isNaN(z))z=1000;
+    backdrop.style.zIndex=z;drawer.style.zIndex=z+1;closeBtn.style.zIndex=z+2;
+  }
+  var baseTokens=drawer.className.trim().split(/\s+/).filter(Boolean);
+  var usesClass=false;
+  function classOpen(){
+    var c=drawer.className.trim().split(/\s+/).filter(Boolean);
+    var extra=c.some(function(t){return baseTokens.indexOf(t)===-1;});
+    if(extra)usesClass=true;
+    return extra;
+  }
+  function geoOpen(){
+    var cs=getComputedStyle(drawer);
+    if(cs.position!=='fixed'&&cs.position!=='absolute')return false;
+    if(cs.display==='none'||cs.visibility==='hidden'||parseFloat(cs.opacity)===0)return false;
+    var r=drawer.getBoundingClientRect();
+    return r.width>4&&r.height>4&&r.left<window.innerWidth-4&&r.right>4&&r.top<window.innerHeight;
+  }
+  // Etat base sur la CLASSE (instantane), avec repli geometrique pour les menus sans classe.
+  function isOpen(){ if(!MOB())return false; var co=classOpen(); return usesClass?co:geoOpen(); }
+  var state=false;
+  function apply(){
+    var op=isOpen();if(op===state)return;state=op;
+    if(op){neutralizeAncestors();place();backdrop.classList.add('hzn-show');closeBtn.style.display='flex';document.documentElement.classList.add('hzn-lock');document.body.classList.add('hzn-lock');}
+    else{backdrop.classList.remove('hzn-show');closeBtn.style.display='none';document.documentElement.classList.remove('hzn-lock');document.body.classList.remove('hzn-lock');restore();}
+  }
+  function close(){if(isOpen())burger.click();setTimeout(apply,60);}
+  burger.addEventListener('click',function(){setTimeout(apply,30);},true);
+  backdrop.addEventListener('click',close);
+  backdrop.addEventListener('touchmove',function(e){e.preventDefault();},{passive:false});
+  closeBtn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();close();});
+  window.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  drawer.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('a'))setTimeout(close,10);});
+  new MutationObserver(function(){apply();}).observe(drawer,{attributes:true,attributeFilter:['class','style']});
+  window.addEventListener('resize',function(){if(!MOB()&&state){state=false;backdrop.classList.remove('hzn-show');closeBtn.style.display='none';document.documentElement.classList.remove('hzn-lock');document.body.classList.remove('hzn-lock');restore();}});
+})();
+</script>
 
 </body>
 </html>
